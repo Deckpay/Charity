@@ -1,11 +1,27 @@
 using System.Security.Principal;
 using Charity.Web.Components;
+using Charity.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Charity.Core.Models;
+using Microsoft.AspNetCore.Identity;
+using Charity.Infrastructure.Data.Seed;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddDbContext<CharityDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
+    .AddEntityFrameworkStores<CharityDbContext>()
+    .AddDefaultTokenProviders();
+
+builder.Services.AddScoped<DbInitializer>();
+
 
 var app = builder.Build();
 
@@ -22,8 +38,18 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+using (var scope = app.Services.CreateScope())
+{
+    var initializer = scope.ServiceProvider.GetRequiredService<DbInitializer>();
+    await initializer.InitializeAsync();
+}
 
 app.Run();
 
